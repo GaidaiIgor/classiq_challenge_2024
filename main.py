@@ -72,39 +72,108 @@ def bits_to_int(bits: ndarray) -> int:
     return sum([2 ** (len(bits) - 1 - ind) for ind, val in enumerate(bits) if val == 1])
 
 
+def transform_const(const: float, num_bits: int) -> tuple[float, int, int]:
+    """
+    Rounds given constant to specified precision and returns representations of the result.
+    :param const: Constant.
+    :param num_bits: Number of bits of precision.
+    :return: 1) Float representation; 2) Int representation; 3) Highest non-zero bit index; 4) Number of bits after first non-zero.
+    """
+    bits = real_to_bits(const, num_bits)
+    first_one_ind = np.where(bits == 1)[0][0]
+    return bits_to_real(bits), bits_to_int(bits), first_one_ind, len(bits) - first_one_ind
+
+
 @QFunc
-def prepare_qnum(out: Output[QNum]):
+def prepare_qnum_plain(int_repr: QParam[int], num_digits: QParam[int], out1: Output[QNum]):
     """
-    Prepares QNum in a value given by val with given precision_x.
-    Uses global variables instead of QParams since QParams do not work.
-    :param out: Prepared QNum.
+    Prepares QNum in a given int state without prepending with zeros.
+    :param int_repr: Integer value to prepare.
+    :param num_digits: Number of binary digits in int_repr.
+    :param out1: Prepared QNum.
     """
-    bits = real_to_bits(const_val, precision_y)
-    basis_ind = bits_to_int(bits)
-    probabilities = [0] * 2 ** len(bits)
-    probabilities[basis_ind] = 1
-    prepare_state(probabilities, 0, out)
-    reinterpret_num(False, precision_y, out)
+    prepare_int(int_repr, out1)
+    reinterpret_num(False, num_digits, out1)
+
+
+@QFunc
+def prepare_qnum_append(int_repr: QParam[int], num_zeros: QParam[int], out2: Output[QNum]):
+    """
+    Prepares QNum in a given int state and prepends with specified number of zeros.
+    :param int_repr: Integer value to prepare.
+    :param num_zeros: Number of zeros to append.
+    :param out2: Prepared QNum.
+    """
+    int_arr = QArray('int_arr')
+    prepare_int(int_repr, int_arr)
+    zeros = QArray('zeros')
+    allocate(num_zeros, zeros)
+    join(int_arr, zeros, out2)
+    reinterpret_num(False, int_arr.len() + zeros.len(), out2)
+
+
+# @QFunc
+# def prepare_qnum(cond: QParam[bool], int_repr: QParam[int], num_zeros: QParam[int], num_digits: QParam[int], out: Output[QNum]):
+#     pass
+    # prepare_qnum_append(int_repr, num_zeros, out1)
+
+    # if cond:
+    #     prepare_int(int_repr, out1)
+    #     reinterpret_num(False, num_digits, out1)
+    # else:
+    #     int_arr = QArray('int_arr')
+    #     prepare_int(int_repr, int_arr)
+    #     zeros = QArray('zeros')
+    #     allocate(num_zeros, zeros)
+    #     join(int_arr, zeros, out1)
+    #     reinterpret_num(False, int_arr.len() + zeros.len(), out1)
+
+    # if_(cond, lambda: prepare_qnum_plain(int_repr, num_digits, out), lambda: prepare_qnum_append(int_repr, num_zeros, out))
+
+
+@QFunc
+def multiplication(a: QParam[float], x: QNum, y: Output[QNum]):
+    y |= a * x
+
+
+@QFunc
+def mult(a: QParam[float], x: QNum, y: QNum):
+    tmp = QNum('tmp')
+    within_apply(lambda: multiplication(a, x, tmp), lambda: inplace_add(tmp, y))
+    # multiplication(a, x, tmp)
+    # inplace_add(tmp, y)
 
 
 @QFunc
 def compute_tanh(precision: QParam[int], x: QNum, tanh_x: Output[QNum]):
-    prepare_qnum(tanh_x)
-    # allocate_num(precision_x, False, precision_x, tanh_x)
+    if taylor_coeffs[0][2] == 0:
+        prepare_qnum_plain(taylor_coeffs[0][1], taylor_coeffs[0][3], tanh_x)
+    else:
+        prepare_qnum_append(taylor_coeffs[0][1], taylor_coeffs[0][2], tanh_x)
+
+    # mult(0.786448, x, tanh_x)
+    # first_order = QNum('first_order')
+    # multiplication(0.786448, x, first_order)
+    # inplace_add(first_order, tanh_x)
 
 
 @QFunc
 def main(x: Output[QNum], y: Output[QNum]):
     allocate_num(precision_x, False, precision_x, x)
     hadamard_transform(x)
+
+    # allocate_num(precision_x, False, precision_x, y)
+    # mult(2, x, y)
+
     compute_tanh(precision_x, x, y)
 
 
 if __name__ == '__main__':
-    precision_x = 4
-    precision_y = 4
-    const_val = 0.462117
+    precision_x = 3
+    taylor_coeffs = [0.462117, 0.786448]
+    taylor_coeffs = [transform_const(const, precision_x) for const in taylor_coeffs]
     qmod = create_model(main)
+    qmod = set_constraints(qmod, Constraints(optimization_parameter='width'))
     qprog = synthesize(qmod)
     print_depth_width(qprog)
     job_result = execute(qprog).result()
