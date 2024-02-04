@@ -1,0 +1,696 @@
+{
+  "functions": [
+    {
+      "name": "prepare_fraction",
+      "param_decls": {
+        "int_repr": {
+          "kind": "int"
+        },
+        "num_zeros": {
+          "kind": "int"
+        },
+        "num_decimal_bits": {
+          "kind": "int"
+        }
+      },
+      "port_declarations": {
+        "out": {
+          "name": "out",
+          "quantum_type": {
+            "kind": "qnum"
+          },
+          "direction": "output"
+        }
+      },
+      "operand_declarations": {},
+      "positional_arg_declarations": [
+        {
+          "name": "int_repr",
+          "classical_type": {
+            "kind": "int"
+          }
+        },
+        {
+          "name": "num_zeros",
+          "classical_type": {
+            "kind": "int"
+          }
+        },
+        {
+          "name": "num_decimal_bits",
+          "classical_type": {
+            "kind": "int"
+          }
+        },
+        {
+          "name": "out",
+          "quantum_type": {
+            "kind": "qnum"
+          },
+          "direction": "output"
+        }
+      ],
+      "body": [
+        {
+          "name": "int_arr",
+          "quantum_type": {
+            "kind": "qvec"
+          }
+        },
+        {
+          "function": "prepare_int",
+          "positional_args": [
+            {
+              "expr": "int_repr"
+            },
+            {
+              "name": "int_arr"
+            }
+          ]
+        },
+        {
+          "name": "zeros",
+          "quantum_type": {
+            "kind": "qvec"
+          }
+        },
+        {
+          "function": "allocate",
+          "positional_args": [
+            {
+              "expr": "num_zeros"
+            },
+            {
+              "name": "zeros"
+            }
+          ]
+        },
+        {
+          "function": "join",
+          "positional_args": [
+            {
+              "name": "int_arr"
+            },
+            {
+              "name": "zeros"
+            },
+            {
+              "name": "out"
+            }
+          ]
+        },
+        {
+          "target": {
+            "name": "out"
+          },
+          "fraction_digits": {
+            "expr": "num_decimal_bits"
+          },
+          "is_signed": {
+            "expr": "False"
+          }
+        }
+      ]
+    },
+    {
+      "name": "frac_add",
+      "param_decls": {
+        "int_repr": {
+          "kind": "int"
+        },
+        "num_zeros": {
+          "kind": "int"
+        },
+        "num_decimals": {
+          "kind": "int"
+        }
+      },
+      "port_declarations": {
+        "y": {
+          "name": "y",
+          "quantum_type": {
+            "kind": "qnum"
+          },
+          "direction": "inout"
+        }
+      },
+      "operand_declarations": {},
+      "positional_arg_declarations": [
+        {
+          "name": "int_repr",
+          "classical_type": {
+            "kind": "int"
+          }
+        },
+        {
+          "name": "num_zeros",
+          "classical_type": {
+            "kind": "int"
+          }
+        },
+        {
+          "name": "num_decimals",
+          "classical_type": {
+            "kind": "int"
+          }
+        },
+        {
+          "name": "y",
+          "quantum_type": {
+            "kind": "qnum"
+          },
+          "direction": "inout"
+        }
+      ],
+      "body": [
+        {
+          "name": "tmp",
+          "quantum_type": {
+            "kind": "qnum"
+          }
+        },
+        {
+          "function": "compute",
+          "positional_args": [
+            {
+              "rename_params": {},
+              "body": [
+                {
+                  "function": "prepare_fraction",
+                  "positional_args": [
+                    {
+                      "expr": "int_repr"
+                    },
+                    {
+                      "expr": "num_zeros"
+                    },
+                    {
+                      "expr": "num_decimals"
+                    },
+                    {
+                      "name": "tmp"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "function": "apply",
+          "positional_args": [
+            {
+              "rename_params": {},
+              "body": [
+                {
+                  "target": {
+                    "name": "y"
+                  },
+                  "value": {
+                    "name": "tmp"
+                  },
+                  "operation": "addition"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "function": "uncompute",
+          "positional_args": [
+            {
+              "rename_params": {},
+              "body": [
+                {
+                  "function": "prepare_fraction",
+                  "positional_args": [
+                    {
+                      "expr": "int_repr"
+                    },
+                    {
+                      "expr": "num_zeros"
+                    },
+                    {
+                      "expr": "num_decimals"
+                    },
+                    {
+                      "name": "tmp"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "multiplication",
+      "param_decls": {
+        "a": {
+          "kind": "real"
+        }
+      },
+      "port_declarations": {
+        "x": {
+          "name": "x",
+          "quantum_type": {
+            "kind": "qnum"
+          },
+          "direction": "inout"
+        },
+        "y": {
+          "name": "y",
+          "quantum_type": {
+            "kind": "qnum"
+          },
+          "direction": "output"
+        }
+      },
+      "operand_declarations": {},
+      "positional_arg_declarations": [
+        {
+          "name": "a",
+          "classical_type": {
+            "kind": "real"
+          }
+        },
+        {
+          "name": "x",
+          "quantum_type": {
+            "kind": "qnum"
+          },
+          "direction": "inout"
+        },
+        {
+          "name": "y",
+          "quantum_type": {
+            "kind": "qnum"
+          },
+          "direction": "output"
+        }
+      ],
+      "body": [
+        {
+          "expression": {
+            "expr": "(a) * (x)"
+          },
+          "result_var": {
+            "name": "y"
+          },
+          "inplace_result": false
+        }
+      ]
+    },
+    {
+      "name": "mult_add",
+      "param_decls": {
+        "a": {
+          "kind": "real"
+        }
+      },
+      "port_declarations": {
+        "x": {
+          "name": "x",
+          "quantum_type": {
+            "kind": "qnum"
+          },
+          "direction": "inout"
+        },
+        "y": {
+          "name": "y",
+          "quantum_type": {
+            "kind": "qnum"
+          },
+          "direction": "inout"
+        }
+      },
+      "operand_declarations": {},
+      "positional_arg_declarations": [
+        {
+          "name": "a",
+          "classical_type": {
+            "kind": "real"
+          }
+        },
+        {
+          "name": "x",
+          "quantum_type": {
+            "kind": "qnum"
+          },
+          "direction": "inout"
+        },
+        {
+          "name": "y",
+          "quantum_type": {
+            "kind": "qnum"
+          },
+          "direction": "inout"
+        }
+      ],
+      "body": [
+        {
+          "name": "tmp",
+          "quantum_type": {
+            "kind": "qnum"
+          }
+        },
+        {
+          "function": "compute",
+          "positional_args": [
+            {
+              "rename_params": {},
+              "body": [
+                {
+                  "function": "multiplication",
+                  "positional_args": [
+                    {
+                      "expr": "a"
+                    },
+                    {
+                      "name": "x"
+                    },
+                    {
+                      "name": "tmp"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "function": "apply",
+          "positional_args": [
+            {
+              "rename_params": {},
+              "body": [
+                {
+                  "target": {
+                    "name": "y"
+                  },
+                  "value": {
+                    "name": "tmp"
+                  },
+                  "operation": "addition"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "function": "uncompute",
+          "positional_args": [
+            {
+              "rename_params": {},
+              "body": [
+                {
+                  "function": "multiplication",
+                  "positional_args": [
+                    {
+                      "expr": "a"
+                    },
+                    {
+                      "name": "x"
+                    },
+                    {
+                      "name": "tmp"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "segment_selector_1",
+      "param_decls": {
+        "domain": {
+          "kind": "struct_instance",
+          "name": "OldStruct"
+        }
+      },
+      "port_declarations": {
+        "x": {
+          "name": "x",
+          "quantum_type": {
+            "kind": "qnum"
+          },
+          "direction": "inout"
+        },
+        "y": {
+          "name": "y",
+          "quantum_type": {
+            "kind": "qnum"
+          },
+          "direction": "output"
+        }
+      },
+      "operand_declarations": {},
+      "positional_arg_declarations": [
+        {
+          "name": "domain",
+          "classical_type": {
+            "kind": "struct_instance",
+            "name": "OldStruct"
+          }
+        },
+        {
+          "name": "x",
+          "quantum_type": {
+            "kind": "qnum"
+          },
+          "direction": "inout"
+        },
+        {
+          "name": "y",
+          "quantum_type": {
+            "kind": "qnum"
+          },
+          "direction": "output"
+        }
+      ],
+      "body": [
+        {
+          "function": "allocate_num",
+          "positional_args": [
+            {
+              "expr": "6"
+            },
+            {
+              "expr": "False"
+            },
+            {
+              "expr": "5"
+            },
+            {
+              "name": "y"
+            }
+          ]
+        },
+        {
+          "function": "frac_add",
+          "positional_args": [
+            {
+              "expr": "(get_field(domain,'int_reprs'))[0]"
+            },
+            {
+              "expr": "(get_field(domain,'num_zeros'))[0]"
+            },
+            {
+              "expr": "5"
+            },
+            {
+              "name": "y"
+            }
+          ]
+        },
+        {
+          "function": "mult_add",
+          "positional_args": [
+            {
+              "expr": "(get_field(domain,'reprs'))[1]"
+            },
+            {
+              "name": "x"
+            },
+            {
+              "name": "y"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "compute_tanh",
+      "param_decls": {
+        "precision": {
+          "kind": "int"
+        }
+      },
+      "port_declarations": {
+        "x": {
+          "name": "x",
+          "quantum_type": {
+            "kind": "qnum"
+          },
+          "direction": "inout"
+        },
+        "tanh_x": {
+          "name": "tanh_x",
+          "quantum_type": {
+            "kind": "qnum"
+          },
+          "direction": "output"
+        }
+      },
+      "operand_declarations": {},
+      "positional_arg_declarations": [
+        {
+          "name": "precision",
+          "classical_type": {
+            "kind": "int"
+          }
+        },
+        {
+          "name": "x",
+          "quantum_type": {
+            "kind": "qnum"
+          },
+          "direction": "inout"
+        },
+        {
+          "name": "tanh_x",
+          "quantum_type": {
+            "kind": "qnum"
+          },
+          "direction": "output"
+        }
+      ],
+      "body": [
+        {
+          "function": "segment_selector_1",
+          "positional_args": [
+            {
+              "expr": "struct_literal(OldStruct, reprs=[0.0625, 0.78125], int_reprs=[2, 25], num_zeros=[4, 1])"
+            },
+            {
+              "name": "x"
+            },
+            {
+              "name": "tanh_x"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "main",
+      "param_decls": {},
+      "port_declarations": {
+        "x": {
+          "name": "x",
+          "quantum_type": {
+            "kind": "qnum"
+          },
+          "direction": "output"
+        },
+        "y": {
+          "name": "y",
+          "quantum_type": {
+            "kind": "qnum"
+          },
+          "direction": "output"
+        }
+      },
+      "operand_declarations": {},
+      "positional_arg_declarations": [
+        {
+          "name": "x",
+          "quantum_type": {
+            "kind": "qnum"
+          },
+          "direction": "output"
+        },
+        {
+          "name": "y",
+          "quantum_type": {
+            "kind": "qnum"
+          },
+          "direction": "output"
+        }
+      ],
+      "body": [
+        {
+          "function": "allocate_num",
+          "positional_args": [
+            {
+              "expr": "5"
+            },
+            {
+              "expr": "False"
+            },
+            {
+              "expr": "5"
+            },
+            {
+              "name": "x"
+            }
+          ]
+        },
+        {
+          "function": "hadamard_transform",
+          "positional_args": [
+            {
+              "name": "x"
+            }
+          ]
+        },
+        {
+          "function": "compute_tanh",
+          "positional_args": [
+            {
+              "expr": "5"
+            },
+            {
+              "name": "x"
+            },
+            {
+              "name": "y"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "types": [
+    {
+      "name": "OldStruct",
+      "variables": {
+        "reprs": {
+          "kind": "list",
+          "element_type": {
+            "kind": "real"
+          }
+        },
+        "int_reprs": {
+          "kind": "list",
+          "element_type": {
+            "kind": "int"
+          }
+        },
+        "num_zeros": {
+          "kind": "list",
+          "element_type": {
+            "kind": "int"
+          }
+        }
+      }
+    }
+  ],
+  "constraints": {
+    "optimization_parameter": "width"
+  }
+}

@@ -10,6 +10,35 @@ import json
 from numpy import ndarray
 
 
+@QStruct
+class FloatInfo:
+    repr: float
+    int_repr: int
+    num_zeros: int
+
+
+@QStruct
+class Segment:
+    coeffs: List[FloatInfo]
+
+
+@QStruct
+class Domain:
+    segments: List[Segment]
+
+
+@QStruct
+class OldStruct:
+    reprs: List[float]
+    int_reprs: List[int]
+    num_zeros: List[int]
+
+
+@QStruct
+class ListWrapper:
+    lst: List[int]
+
+
 def evaluate_score_stage_1(results, user_input_precision):
     # The array of values the code is compared against
     calculated_precision = 10
@@ -75,16 +104,16 @@ def bits_to_int(bits: ndarray) -> int:
     return sum([2 ** (len(bits) - 1 - ind) for ind, val in enumerate(bits) if val == 1])
 
 
-def transform_val(val: float, num_bits_val: int, num_bits_integer: int, num_bits_decimal: int) -> tuple[float, int, int]:
+def get_float_info(val: float, num_bits_val: int, num_bits_integer: int, num_bits_decimal: int) -> FloatInfo:
     """
-    Rounds given value between 0 and 1 to specified precision and returns representations of the result.
+    Converts given float to FloatInfo struct.
     :param val: Value to convert, between 0 and 1.
     :param num_bits_val: Number of bits in val conversion.
     :param num_bits_integer: Number of bits in the result.
     :param num_bits_decimal: Number of bits to use for value conversion.
-    :return: 1) Float representation; 2) Int representation; 3) Number of zeros on the left from the highest 1.
+    :return: FloatInfo.
     """
-    assert val >= 0
+    assert val > 0
     assert val < 1
     assert num_bits_decimal >= num_bits_val
 
@@ -92,13 +121,7 @@ def transform_val(val: float, num_bits_val: int, num_bits_integer: int, num_bits
     bits = np.concatenate((bits, [0] * (num_bits_decimal - num_bits_val)))
     first_one_ind = np.where(bits == 1)[0][0]
     zeros_left = num_bits_integer + first_one_ind
-    return bits_to_real(bits), bits_to_int(bits), zeros_left
-
-
-@QStruct
-class FractionsList:
-    int_repr: List[int]
-    num_zeros: List[int]
+    return FloatInfo(bits_to_real(bits), bits_to_int(bits), zeros_left)
 
 
 @QFunc
@@ -142,29 +165,91 @@ def mult_add(a: QParam[float], x: QNum, y: QNum):
 
 
 @QFunc
+def mult_add_extra(a: QParam[float], i: QParam[int], x: QArray, y: QNum):
+    # if_(i == 0, lambda: IDENTITY(y), lambda: mult_add_extra_2(a, i, y))
+    if_(i == 0, lambda: mult_add_extra_0(a, x, y), lambda: IDENTITY(y))
+    # tmp = QNum('tmp')
+    # arr = ListWrapper([0, 1])
+    # prepare_int(arr.lst[i], tmp)
+
+    # mult_add(a, x, y)
+
+    # tmp2 = QArray('tmp2')
+    # join(x, tmp, tmp2)
+    #
+    # mult_add_extra_2(a, tmp2, y)
+
+
+@QFunc
+def mult_add_extra_0(a: QParam[float], x: QArray, y: QNum):
+    tmp = QArray('tmp')
+    allocate(1, tmp)
+    mult_add(a, x, y)
+
+
+@QFunc
+def mult_add_extra_2(a: QParam[float], x: QNum, y: QNum):
+    reinterpret_num(False, 2, x)
+    mult_add(a, x, y)
+
+
+@QFunc
 def frac_add(int_repr: QParam[int], num_zeros: QParam[int], num_decimals: QParam[int], y: QNum):
     tmp = QNum('tmp')
-    prepare_fraction(int_repr, num_zeros, num_decimals, tmp)
-    inplace_add(tmp, y)
+    within_apply(lambda: prepare_fraction(int_repr, num_zeros, num_decimals, tmp), lambda: inplace_add(tmp, y))
+
+
+# @QFunc
+# def segment_selector(domain: QParam[Domain], selector: QNum, y: Output[QNum]):
+#     allocate_num(precision_y_integer + precision_y_decimal, False, precision_y_decimal, y)
+#     repeat(2, lambda i: quantum_if(selector == i, lambda: frac_add(domain.segments[i].coeffs[0].int_repr, domain.segments[i].coeffs[0].num_zeros, precision_y_decimal, y)))
+#     # repeat(2, lambda i: quantum_if(selector == i, lambda: mult_add(domain.segments[i].coeffs[1].repr, selector, y)))
 
 
 @QFunc
-def const_selector(consts: QParam[FractionsList], x: QNum, y: Output[QNum]):
+def segment_selector(domain: QParam[OldStruct], selector: QNum, x: QArray, y: Output[QNum]):
     allocate_num(precision_y_integer + precision_y_decimal, False, precision_y_decimal, y)
-    repeat(2, lambda i: quantum_if(x == i, lambda: frac_add(consts.int_repr[i], consts.num_zeros[i], precision_y_decimal, y)))
+    # repeat(2, lambda i: quantum_if(selector == i, lambda: frac_add(domain.int_reprs[i], domain.num_zeros[i], precision_y_decimal, y)))
+
+    # tmp = QNum('tmp')
+    # join(x, selector, tmp)
+
+    # reinterpret_num(False, precision_x - 1, x)
+    repeat(2, lambda i: quantum_if(selector == i, lambda: mult_add_extra(domain.reprs[i + 2], i, x, y)))
 
 
 @QFunc
-def compute_tanh(precision: QParam[int], x: QArray, tanh_x: Output[QNum]):
-    const_selector(frac_list, x[1], tanh_x)
-    # repeat(2, lambda i: quantum_if(x[0] == i, lambda: prepare_fraction(fitting_coeffs[i][1], fitting_coeffs[i][2], precision_y_decimal, tanh_x)))
-    # quantum_if(x[0] == 0, lambda: prepare_fraction(fitting_coeffs[0][1], fitting_coeffs[0][2], precision_y_decimal, tanh_x))
-    # quantum_if(x[0] == 1, lambda: prepare_fraction(fitting_coeffs[1][1], fitting_coeffs[1][2], precision_y_decimal, tanh_x))
+def segment_selector_1(domain: QParam[OldStruct], x: QNum, y: Output[QNum]):
+    allocate_num(precision_y_integer + precision_y_decimal, False, precision_y_decimal, y)
+    frac_add(domain.int_reprs[0], domain.num_zeros[0], precision_y_decimal, y)
+    mult_add(domain.reprs[1], x, y)
 
-    # prepare_fraction(fitting_coeffs[0][1], fitting_coeffs[0][2], precision_y_decimal, tanh_x)
-    #
-    # if len(fitting_coeffs) > 1:
-    #     mult_add(fitting_coeffs[1][0], x, tanh_x)
+
+# @QFunc
+# def segment_selector(domain: QParam[OldStruct], selector: QNum, x: QNum, y: Output[QNum]):
+#     # allocate_num(precision_y_integer + precision_y_decimal, False, precision_y_decimal, y)
+#     # repeat(2, lambda i: quantum_if(selector == i, lambda: frac_add(domain.int_reprs[i], domain.num_zeros[i], precision_y_decimal, y)))
+#
+#     allocate_num(6, False, 5, y)
+#     reinterpret_num(False, precision_x - 1, x)
+#     mult_add(0.5, x, y)
+#
+#     # repeat(2, lambda i: quantum_if(selector == i, lambda: mult_add_extra(domain.reprs[i + 2], i, x, y)))
+
+
+@QFunc
+def compute_tanh(precision: QParam[int], x: QNum, tanh_x: Output[QNum]):
+    # # allocate_num(precision_y_integer + precision_y_decimal, False, precision_y_decimal, tanh_x)
+    # # frac_add(domain_data.int_reprs[0], domain_data.num_zeros[0], precision_y_decimal, tanh_x)
+    # prepare_fraction(1, 4, 5, tanh_x)
+    # # tmp = QNum('tmp')
+    # # prepare_fraction(1, 1, 2, tmp)
+    # # reinterpret_num(False, precision_x, x)
+    # mult_add(0.125, x, tanh_x)
+
+    segment_selector(domain_data, x[precision_x - 1], x[0:precision_x - 1], tanh_x)
+
+    # segment_selector_1(domain_data, x, tanh_x)
 
 
 @QFunc
@@ -173,25 +258,47 @@ def main(x: Output[QNum], y: Output[QNum]):
     hadamard_transform(x)
     compute_tanh(precision_x, x, y)
 
+    # prepare_fraction(1, 2, 3, x)
+    # prepare_fraction(2, 2, 4, y)
+    # mult_add(0.9375, x, y)
+
+
+def save_new_file(program_to_save, file_name):
+    file = open(file_name, "w")
+    file.write(program_to_save)
+    file.close()
+
 
 if __name__ == '__main__':
-    precision_x = 3
+    precision_x = 2
     precision_y_integer = 1
     precision_y_decimal = 4
-    precision_consts = 4
-    # fitting_coeffs = [0.462117]
-    # fitting_coeffs = [0.068893, 0.786448]
-    fitting_coeffs = [0.04776875, 0.77203427]
+    precision_consts = 3
 
-    coeff_descriptors = [transform_val(val, precision_consts, precision_y_integer, precision_y_decimal) for val in fitting_coeffs]
-    int_reprs_list = [tpl[1] for tpl in coeff_descriptors]
-    num_zeros_list = [tpl[2] for tpl in coeff_descriptors]
-    frac_list = FractionsList(int_reprs_list, num_zeros_list)
+    # fitting_coeffs = [0.03348032, 0.77149773]
+    fitting_coeffs = [0.068893, 0.786448]
+    # fitting_coeffs = [0.125, 0.5]
+
+    # fitting_coeffs = [[0.1, 0.9360805], [0.17697803, 0.59464997]]  # 0.00256892
+    # domain_data = Domain([Segment([get_float_info(num, precision_consts, precision_y_integer, precision_y_decimal) for num in segment]) for segment in fitting_coeffs])
+
+    # fitting_coeffs = [0.1, 0.17697803, 0.9360805, 0.59464997]
+    # fitting_coeffs = [0.125, 0.125, 0.125, 0.125]
+    # int_repr_list = [float_info.int_repr for segment in domain_data.segments for float_info in segment.coeffs]
+    # num_zeros_list = [float_info.num_zeros for segment in domain_data.segments for float_info in segment.coeffs]
+    repr_list = [get_float_info(val, precision_consts, precision_y_integer, precision_y_decimal).repr for val in fitting_coeffs]
+    int_repr_list = [get_float_info(val, precision_consts, precision_y_integer, precision_y_decimal).int_repr for val in fitting_coeffs]
+    num_zeros_list = [get_float_info(val, precision_consts, precision_y_integer, precision_y_decimal).num_zeros for val in fitting_coeffs]
+    domain_data = OldStruct(repr_list, int_repr_list, num_zeros_list)
 
     qmod = create_model(main)
     qmod = set_constraints(qmod, Constraints(optimization_parameter='width'))
     qprog = synthesize(qmod)
-    # show(qprog)
+
+    # save_new_file(qmod, 'qmod2.qmod')
+    # save_new_file(qprog, 'qprog2.qprog')
+
+    # # show(qprog)
     print_depth_width(qprog)
     job_result = execute(qprog).result()
     parsed_counts = job_result[0].value.parsed_counts
